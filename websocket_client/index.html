@@ -1,0 +1,134 @@
+<!DOCTYPE HTML>
+
+<html>
+   <head>
+        <style>
+        * { font-family:tahoma; font-size:12px; padding:0px; margin:0px; }
+        p { line-height:18px; }
+        div { width:500px; margin-left:auto; margin-right:auto;}
+        #content { padding:5px; background:#ddd; border-radius:5px; overflow-y: scroll;
+                   border:1px solid #CCC; margin-top:10px; height: 160px; }
+        #input { border-radius:2px; border:1px solid #ccc;
+                 margin-top:10px; padding:5px; width:400px;  }
+        #status { width:88px; display:block; float:left; margin-top:15px; }
+        </style>
+      <script type = "text/javascript">
+	     var ws;
+		 var nameEntered = false;
+		 
+		 var calculate_time = false;
+		 var start_sec = 0;
+		 var start_milli = 0;
+		 
+		 function getTimeDiff(_start_sec, _start_milli, _end_sec, _end_milli) {
+		    var t = 0;
+			if (_end_sec >= _start_sec) {
+			    t = _end_sec * 1000 + _end_milli - (_start_sec * 1000 + _start_milli);
+			} else {
+			    t = (_end_sec + 60) * 1000 + _end_milli - (_start_sec * 1000 + _start_milli);
+			}
+			return t;
+		 }
+		 		 
+	     function handleLoading() {
+		    var d = new Date();
+			start_sec = d.getSeconds();
+			start_milli = d.getMilliseconds();
+			//var t = s + ':' + m;
+			//console.log('Timestamp: ' + t);
+			calculate_time = true;
+		    startChat();
+		 }
+         function startChat() {
+            
+            if ("WebSocket" in window) {
+               console.log("WebSocket is supported by your Browser!");
+               
+               // Let us open a web socket
+               ws = new WebSocket("ws://192.168.174.131:8080");
+			   //ws = new WebSocket("ws://192.168.174.128:9999");
+			   //ws = new WebSocket("ws://ec2-54-167-76-66.compute-1.amazonaws.com:8080");
+				
+               ws.onopen = function() {
+			   if (calculate_time === true) {
+					var d = new Date();
+					var end_sec = d.getSeconds();
+					var end_milli = d.getMilliseconds();
+					var t = getTimeDiff(start_sec, start_milli, end_sec, end_milli);
+					console.log('Connection Time: ' + t + ' ms');
+					calculate_time = false;
+				}
+                  // Web Socket is connected, send data using send()
+				  document.getElementById("status").innerHTML = 'Enter Name';
+				  document.getElementById("input").disabled = false;
+               };
+				
+               ws.onmessage = function (evt) {
+			     if (calculate_time === true) {
+					var d = new Date();
+					var end_sec = d.getSeconds();
+					var end_milli = d.getMilliseconds();
+					var t = getTimeDiff(start_sec, start_milli, end_sec, end_milli);
+					console.log('Message RTT: ' + t + ' ms');
+					calculate_time = false;
+				  }
+			   
+                  var received_msg = evt.data;
+                  console.log("Received: " + received_msg);
+				  var history = document.getElementById("content").innerHTML;
+				  document.getElementById("content").innerHTML = history + received_msg + '</br>';
+               };
+				
+               ws.onclose = function() {                   
+                  // websocket is closed.
+                  console.log("Connection is closed..."); 
+				  document.getElementById("input").value = 'Server disconnected'
+				  document.getElementById("input").disabled = true;
+               };
+            } else {
+              
+               // The browser doesn't support WebSocket
+               console.log("WebSocket NOT supported by your Browser!");
+            }
+         }
+		 function handleChatInput() {
+			var key = window.event.keyCode;
+
+			// If the user has pressed enter
+			if (key === 13) {
+				//document.getElementById("txtArea").value = document.getElementById("txtArea").value + "\n*";
+		        if (nameEntered === false) {
+					//console.log('Entered name: ' + document.getElementById("input").value);
+					document.getElementById("status").innerHTML = document.getElementById("input").value;
+					var connectMsg = {"message": "connect", "data" : document.getElementById("input").value};
+					ws.send(JSON.stringify(connectMsg));
+					document.getElementById("input").value = "";
+					nameEntered = true;
+				} else {
+					var connectMsg = {"message": "chat", "data" : document.getElementById("input").value};
+		            var d = new Date();
+			        start_sec = d.getSeconds();
+			        start_milli = d.getMilliseconds();
+					calculate_time = true;
+					ws.send(JSON.stringify(connectMsg));
+					document.getElementById("input").value = "";				
+				}
+				return false;
+			}
+			else {
+				return true;
+			}
+		 }
+		 
+      </script>
+		
+   </head>
+   
+   <body onLoad="handleLoading()">
+      <div id="content"></div>
+        <div>
+            <span id="status" style="font-weight: bold;">Connecting...</span>
+            <input type="text" id="input" disabled="disabled" onkeypress="handleChatInput();"/>
+        </div>
+   </body>
+</html>
